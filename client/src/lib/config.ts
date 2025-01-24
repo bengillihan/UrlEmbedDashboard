@@ -16,7 +16,7 @@ export const DASHBOARD_URLS = [
   },
   {
     id: 'test-salesflow',
-    url: 'https://22762c29-3853-49fd-8fab-68c62fe53f01-00-ne1gi181pknk.kirk.replit.dev/',
+    url: 'https://sales-dashboard-v-2-bdgillihan.replit.app/',
     title: 'Test Salesflow'
   }
 ] as const;
