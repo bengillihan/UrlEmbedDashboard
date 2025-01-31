@@ -18,5 +18,10 @@ export const DASHBOARD_URLS = [
     id: 'test-salesflow',
     url: 'https://sales-dashboard-v-2-bdgillihan.replit.app',
     title: 'Test Salesflow'
+  },
+  {
+    id: 'table-syncs',
+    url: 'https://americanpower.quickbase.com/db/btqxmmkir/tablereport?a=td',
+    title: 'Table Syncs'
   }
 ] as const;
