@@ -1,0 +1,1043 @@
+from quickbase_client import QuickBaseClient
+
+import os
+import logging
+import jwt
+from datetime import datetime, timedelta
+from functools import wraps
+from flask import Blueprint, render_template, redirect, url_for, request, jsonify, flash, session, make_response, current_app
+from flask_login import login_user, logout_user, login_required, current_user
+from werkzeug.security import generate_password_hash
+from pytz import timezone
+from extensions import db
+from models import User, UserRole, Collection, ChangesLog, SyncTime, UserPreference
+
+def format_pacific_time_func(dt):
+    """Format datetime to Pacific timezone string"""
+    if not dt:
+        return ""
+    pacific = timezone('US/Pacific')
+    if isinstance(dt, str):
+        try:
+            dt = datetime.fromisoformat(dt.replace('Z', '+00:00'))
+        except (ValueError, AttributeError):
+            return dt
+    try:
+        pacific_time = dt.astimezone(pacific)
+        return pacific_time.strftime("%Y-%m-%d %I:%M:%S %p %Z")
+    except (ValueError, AttributeError):
+        return str(dt)
+
+def format_thousands(value):
+    """Format a number with thousands separator"""
+    try:
+        return "{:,}".format(float(value))
+    except (ValueError, TypeError):
+        return "0"
+
+# Create blueprint
+main = Blueprint('main', __name__)
+
+# Add template filters
+main.add_app_template_filter(format_pacific_time_func, 'format_pacific_time')
+main.add_app_template_filter(format_thousands, 'thousands')
+
+# Add this after the blueprint creation but before the routes
+@main.context_processor
+def inject_globals():
+    """Make commonly used objects available to all templates."""
+    return {
+        'UserRole': UserRole,
+        'current_time': datetime.now(),
+        'format_pacific_time': format_pacific_time_func,
+        'format_thousands': format_thousands
+    }
+
+# Decorator definitions
+def admin_required(f):
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        if not current_user.has_role(UserRole.ADMIN):
+            return redirect(url_for('main.dashboard')), 403
+        return f(*args, **kwargs)
+    return decorated_function
+
+def role_required(role):
+    def decorator(f):
+        @wraps(f)
+        def decorated_function(*args, **kwargs):
+            if not current_user.has_role(UserRole[role]):
+                return redirect(url_for('main.dashboard'))
+            return f(*args, **kwargs)
+        return decorated_function
+    return decorator
+
+def generate_embed_token():
+    """Helper function to generate secure embed tokens"""
+    return None  # Deprecated
+
+
+# Routes start here
+@main.route('/')
+def index():
+    if current_user.is_authenticated:
+        return redirect(url_for('main.dashboard'))
+    return redirect(url_for('main.login'))
+
+@main.route('/login', methods=['GET', 'POST'])
+def login():
+    if current_user.is_authenticated:
+        return redirect(url_for('main.dashboard'))
+
+    if request.method == 'POST':
+        # Get form data regardless of content type
+        data = request.get_json() if request.is_json else request.form
+        email = data.get('email')
+        password = data.get('password')
+
+        if not email or not password:
+            logging.warning(f"Login attempt with missing credentials: email={email}")
+            response = jsonify({
+                "success": False,
+                "message": "Email and password are required"
+            })
+            return response, 400
+
+        user = User.query.filter_by(email=email).first()
+
+        if not user:
+            logging.warning(f"Login attempt with non-existent email: {email}")
+            response = jsonify({
+                "success": False,
+                "message": "Invalid email or password"
+            })
+            return response, 401
+
+        # Add detailed logging for password verification
+        logging.info(f"Attempting password verification for user: {email}")
+        password_valid = user.check_password(password)
+        logging.info(f"Password verification result for {email}: {password_valid}")
+
+        if not password_valid:
+            logging.warning(f"Failed login attempt for user: {email} - password verification failed")
+            response = jsonify({
+                "success": False,
+                "message": "Invalid email or password"
+            })
+            return response, 401
+
+        if not user.is_active:
+            logging.warning(f"Login attempt for inactive user: {email}")
+            response = jsonify({
+                "success": False,
+                "message": "Your account is inactive. Please contact an administrator."
+            })
+            return response, 403
+
+        # Clear any existing session data
+        session.clear()
+
+        # Set remember=True for persistent login
+        login_user(user, remember=True)
+
+        logging.info(f"Successful login for user: {email}")
+
+        # Create response with success message and redirect URL
+        response = jsonify({
+            "success": True,
+            "redirect": url_for('main.dashboard')
+        })
+
+        # Set secure headers
+        response.headers['Content-Security-Policy'] = "default-src 'self' 'unsafe-inline' 'unsafe-eval' https:; img-src 'self' data: https:;"
+        response.headers['X-Content-Type-Options'] = 'nosniff'
+        response.headers['X-Frame-Options'] = 'SAMEORIGIN'
+
+        return response
+
+    # For GET requests, render the login template
+    return render_template('login.html')
+
+@main.route('/register', methods=['GET', 'POST'])
+def register():
+    if current_user.is_authenticated:
+        return redirect(url_for('main.dashboard'))
+
+    if request.method == 'POST':
+        email = request.form.get('email')
+        password = request.form.get('password')
+
+        if not email or not password:
+            return jsonify({
+                "success": False,
+                "message": "Email and password are required"
+            }), 400
+
+        if User.query.filter_by(email=email).first():
+            return jsonify({
+                "success": False,
+                "message": "Email already registered"
+            }), 400
+
+        user = User(
+            email=email,
+            role=UserRole.USER,
+            is_active=True
+        )
+        user.set_password(password)
+
+        try:
+            db.session.add(user)
+            db.session.commit()
+            login_user(user)
+            return jsonify({
+                "success": True,
+                "redirect": url_for('main.dashboard')
+            })
+        except Exception as e:
+            db.session.rollback()
+            return jsonify({
+                "success": False,
+                "message": "Registration failed. Please try again."
+            }), 500
+
+    return render_template('register.html')
+
+@main.route('/logout')
+@login_required
+def logout():
+    logout_user()
+    return redirect(url_for('main.login'))
+
+@main.route('/dashboard')
+@login_required
+def dashboard():
+    try:
+        logging.info(f"Starting dashboard data fetch for user: {current_user.email}")
+
+        # Build the base query for collections with sorting by balance
+        query = db.select(Collection).order_by(Collection.balance.desc())
+        collections = db.session.execute(query).scalars().all()
+
+        # Initialize empty lists
+        orders = []
+        jobs = []
+        quotes = []
+
+        try:
+            client = QuickBaseClient()
+            orders = client.get_orders()
+            jobs = client.get_jobs()
+            all_quotes = client.get_quotes()
+
+            # Process quotes and filter by date
+            current_date = datetime.now()
+            for quote in all_quotes:
+                if quote and 'date' in quote and quote['date']:
+                    try:
+                        quote_date = datetime.strptime(quote['date'], '%Y-%m-%d')
+                        days_old = (current_date - quote_date).days
+                        quote['days_old'] = days_old
+                        if days_old <= 180:  # Only include quotes from last 180 days
+                            quotes.append(quote)
+                    except (ValueError, KeyError) as e:
+                        logging.warning(f"Error processing quote date: {str(e)}")
+                        continue
+
+            logging.info(f"Data counts - Collections: {len(collections)}, Orders: {len(orders)}, Jobs: {len(jobs)}, Quotes: {len(quotes)}")
+
+            # Convert decimal values to float for JSON serialization
+            for collection in collections:
+                if hasattr(collection, 'balance'):
+                    collection.balance = float(collection.balance)
+
+        except Exception as e:
+            logging.error(f"Failed to fetch QuickBase data: {str(e)}")
+            flash("Some data may be unavailable. Please try again later.", "warning")
+
+        return render_template('dashboard.html',
+                           invoices=collections,
+                           orders=orders,
+                           jobs=jobs,
+                           quotes=quotes)
+
+    except Exception as e:
+        logging.error(f"Failed to fetch dashboard data: {str(e)}", exc_info=True)
+        flash("Failed to fetch data. Please try again later.", "error")
+        return render_template('dashboard.html',
+                           invoices=[],
+                           orders=[],
+                           jobs=[],
+                           quotes=[])
+
+@main.route('/admin/dashboard')
+@login_required
+@role_required('ADMIN')
+def admin_dashboard():
+    users = User.query.order_by(User.email).all()
+    changes_log = ChangesLog.query.order_by(ChangesLog.date.desc()).all()
+
+    # Get all sync times using the model
+    sync_times_result = SyncTime.query.all()
+    sync_times = {st.sync_type: st.last_sync_time for st in sync_times_result}
+
+    # Ensure all sync types have an entry in the dictionary
+    for sync_type in ['users', 'collections', 'orders', 'jobs', 'quotes']:
+        if sync_type not in sync_times:
+            sync_times[sync_type] = None
+
+    return render_template('admin_dashboard.html',
+                         users=users,
+                         roles=UserRole,
+                         changes_log=changes_log,
+                         sync_times=sync_times)
+
+@main.route('/admin/users/<int:user_id>/role', methods=['PUT'])
+@login_required
+@role_required('ADMIN')
+def update_user_role(user_id):
+    try:
+        user = User.query.get_or_404(user_id)
+        data = request.get_json()
+
+        if user.email == 'bengillihan@ampowersys.com':
+            return jsonify({"success": False, "message": "Cannot modify admin user"}), 403
+
+        new_role = data.get('role')
+        if new_role not in [role.value for role in UserRole]:
+            return jsonify({"success": False, "message": "Invalid role"}), 400
+
+        user.role = UserRole[new_role]
+        db.session.commit()
+
+        return jsonify({"success": True})
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({"success": False, "message": str(e)}), 500
+
+@main.route('/admin/users/<int:user_id>/status', methods=['PUT'])
+@login_required
+@role_required('ADMIN')
+def update_user_status(user_id):
+    try:
+        user = User.query.get_or_404(user_id)
+        if not request.is_json:
+            return jsonify({"success": False, "message": "Invalid request format"}), 400
+
+        data = request.get_json()
+        if 'is_active' not in data:
+            return jsonify({"success": False, "message": "Missing is_active field"}), 400
+
+        if user.email == 'bengillihan@ampowersys.com':
+            return jsonify({"success": False, "message": "Cannot modify admin user"}), 403
+
+        user.is_active = bool(data['is_active'])
+        db.session.commit()
+
+        return jsonify({"success": True, "message": "User status updated successfully"})
+    except Exception as e:
+        db.session.rollback()
+        logging.error(f"Failed to update user status: {str(e)}")
+        return jsonify({"success": False, "message": "Failed to update user status. Please try again."}), 500
+
+@main.route('/admin/users/<int:user_id>', methods=['DELETE'])
+@login_required
+@role_required('ADMIN')
+def delete_user(user_id):
+    try:
+        user = User.query.get_or_404(user_id)
+
+        if user.email == 'bengillihan@ampowersys.com':
+            return jsonify({"success": False, "message": "Cannot delete admin user"}), 403
+
+        # Delete related records first if any foreign key constraints exist
+        db.session.delete(user)
+        db.session.flush()  # Flush changes to check for any constraint violations
+        db.session.commit()
+
+        return jsonify({"success": True})
+    except Exception as e:
+        db.session.rollback()
+        logging.error(f"Failed to delete user: {str(e)}")
+        return jsonify({"success": False, "message": "Failed to delete user. Please try again."}), 500
+
+@main.route('/admin/test-quickbase', methods=['GET'])
+@login_required
+@role_required('ADMIN')
+def test_quickbase_connection():
+    try:
+        client = QuickBaseClient()
+        if client.test_connection():
+            return jsonify({"success": True, "message": "QuickBase connection successful"})
+        else:
+            return jsonify({"success": False, "message": "QuickBase connection failed"}), 500
+    except Exception as e:
+        return jsonify({"success": False, "message": str(e)}), 500
+
+@main.route('/admin/sync-users', methods=['POST'])
+@login_required
+@role_required('ADMIN')
+def sync_users():
+    try:
+        client = QuickBaseClient()
+        quickbase_users = client.get_users()
+
+        # Track changes and sync time
+        users_added = 0
+        users_removed = 0
+        sync_time = datetime.now()
+
+        # Create or update users from QuickBase
+        for qb_user in quickbase_users:
+            user = User.query.filter_by(email=qb_user['email']).first()
+            if user:
+                # Update existing user
+                user.name = qb_user['name']
+                user.office = qb_user['office']
+            else:
+                # Create new user
+                new_user = User(
+                    email=qb_user['email'],
+                    role=UserRole[qb_user['role']],
+                    name=qb_user['name'],
+                    office=qb_user['office'],
+                    is_active=True
+                )
+                db.session.add(new_user)
+                users_added += 1
+
+        # Delete users not in QuickBase and users without both name and office
+        qb_emails = [u['email'] for u in quickbase_users]
+        for user in User.query.all():
+            if user.email == 'bengillihan@ampowersys.com':
+                continue
+
+            if user.email not in qb_emails or (not user.name and not user.office):
+                db.session.delete(user)
+                users_removed += 1
+
+        # Update sync time in database
+        sync_record = SyncTime.query.filter_by(sync_type='users').first()
+        if sync_record:
+            sync_record.last_sync_time = sync_time
+        else:
+            sync_record = SyncTime(sync_type='users', last_sync_time=sync_time)
+            db.session.add(sync_record)
+
+        db.session.commit()
+
+        return jsonify({
+            "success": True,
+            "message": f"Sync complete. Added {users_added} users, deactivated {users_removed} users.",
+            "sync_time": format_pacific_time_func(sync_time)
+        })
+    except Exception as e:
+        db.session.rollback()
+        logging.error(f"User sync failed: {str(e)}")
+        return jsonify({"success": False, "message": str(e)}), 500
+
+@main.route('/admin/sync-orders', methods=['POST'])
+@login_required
+@role_required('ADMIN')
+def sync_orders():
+    try:
+        client = QuickBaseClient()
+        if not client.test_connection():
+            return jsonify({
+                "success": False,
+                "message": "Failed to connect to QuickBase. Please check your credentials."
+            }), 500
+
+        try:
+            orders = client.get_orders(None)  # None to get all orders
+            sync_time = datetime.now()
+            sync_record = SyncTime.query.filter_by(sync_type='orders').first()
+            if sync_record:
+                sync_record.last_sync_time = sync_time
+            else:
+                sync_record = SyncTime(sync_type='orders', last_sync_time=sync_time)
+                db.session.add(sync_record)
+            db.session.commit()
+            db.session.commit()
+            return jsonify({
+                "success": True,
+                "message": f"Successfully synced {len(orders)} orders from QuickBase.",
+                "sync_time": format_pacific_time_func(sync_time)
+            })
+        except Exception as e:
+            logging.error(f"Failed to fetch orders: {str(e)}")
+            return jsonify({
+                "success": False,
+                "message": "Failed to fetch orders from QuickBase. Please try again."
+            }), 500
+
+    except Exception as e:
+        logging.error(f"Orders sync failed: {str(e)}")
+        return jsonify({
+            "success": False,
+            "message": "An unexpected error occurred during sync. Please try again."
+        }), 500
+
+@main.route('/admin/sync-jobs', methods=['POST'])
+@login_required
+@role_required('ADMIN')
+def sync_jobs():
+    try:
+        client = QuickBaseClient()
+        if not client.test_connection():
+            return jsonify({
+                "success": False,
+                "message": "Failed to connect to QuickBase. Please check your credentials."
+            }), 500
+
+        try:
+            jobs = client.get_jobs(None)  # None to get all jobs
+            sync_time = datetime.now()
+            sync_record = SyncTime.query.filter_by(sync_type='jobs').first()
+            if sync_record:
+                sync_record.last_sync_time = sync_time
+            else:
+                sync_record = SyncTime(sync_type='jobs', last_sync_time=sync_time)
+                db.session.add(sync_record)
+            db.session.commit()
+            db.session.commit()
+            return jsonify({
+                "success": True,
+                "message": f"Successfully synced {len(jobs)} jobs from QuickBase.",
+                "sync_time": format_pacific_time_func(sync_time)
+            })
+        except Exception as e:
+            logging.error(f"Failed to fetch jobs: {str(e)}")
+            return jsonify({
+                "success": False,
+                "message": "Failed to fetch jobs from QuickBase. Please try again."
+            }), 500
+
+    except Exception as e:
+        logging.error(f"Jobs sync failed: {str(e)}")
+        return jsonify({
+            "success": False,
+            "message": "An unexpected error occurred during sync. Please try again."
+        }), 500
+
+@main.route('/admin/sync-quotes', methods=['POST'])
+@login_required
+@role_required('ADMIN')
+def sync_quotes():
+    # Use a nested transaction to ensure proper rollback
+    try:
+        db.session.begin_nested()
+
+        try:
+            logging.info("Starting quotes sync process")
+            client = QuickBaseClient()
+
+            # Test QuickBase connection
+            if not client.test_connection():
+                logging.error("Failed to connect to QuickBase")
+                return jsonify({
+                    "success": False,
+                    "message": "Failed to connect to QuickBase. Please check your credentials."
+                }), 500
+
+            # Fetch quotes from QuickBase
+            try:
+                quotes = client.get_quotes(None)  # None to get all quotes
+                logging.info(f"Successfully fetched {len(quotes) if quotes else 0} quotes from QuickBase")
+            except Exception as e:
+                logging.error(f"Error fetching quotes from QuickBase: {str(e)}")
+                raise  # Re-raise to be caught by outer try block
+
+            if not quotes:
+                logging.warning("No quotes data received from QuickBase")
+                return jsonify({
+                    "success": False,
+                    "message": "No quotes data received from QuickBase."
+                }), 500
+
+            # Update sync time
+            sync_time = datetime.now()
+            sync_record = SyncTime.query.filter_by(sync_type='quotes').first()
+
+            if sync_record:
+                sync_record.last_sync = sync_time
+            else:
+                sync_record = SyncTime(sync_type='quotes', last_sync=sync_time)
+                db.session.add(sync_record)
+
+            # Commit the transaction
+            db.session.commit()
+            logging.info(f"Successfully synced {len(quotes)} quotes and updated sync time")
+
+            # Update sync time
+            sync_time = datetime.now()
+            sync_record = SyncTime.query.filter_by(sync_type='quotes').first()
+
+            if sync_record:
+                sync_record.last_sync = sync_time
+            else:
+                sync_record = SyncTime(sync_type='quotes', last_sync=sync_time)
+                db.session.add(sync_record)
+
+            # Commit the sync time update
+            db.session.commit()
+
+            # Format the sync time for response
+            formatted_time = format_pacific_time_func(sync_time)
+
+            return jsonify({
+                "success": True,
+                "message": f"Successfully synced {len(quotes)} quotes from QuickBase.",
+                "sync_time": formatted_time
+            })
+
+        except Exception as e:
+            # Rollback the nested transaction
+            db.session.rollback()
+            logging.error(f"Error during quotes sync: {str(e)}")
+            raise
+    except Exception as e:
+        # Handle any error that occurred during the process
+        logging.error(f"Failed to sync quotes: {str(e)}")
+        return jsonify({
+            "success": False,
+            "message": "Failed to sync quotes. Please try again."
+        }), 500
+
+@main.route('/admin/sync-collections', methods=['POST'])
+@login_required
+@role_required('ADMIN')
+def sync_collections():
+    try:
+        logging.info("Starting collections sync process")
+        client = QuickBaseClient()
+
+        # Fetch collections
+        try:
+            collections = client.get_invoices()
+            logging.info(f"Successfully fetched {len(collections)} collections from QuickBase")
+        except Exception as e:
+            logging.error(f"Failed to fetch collections: {str(e)}")
+            return jsonify({
+                "success": False,
+                "message": "Failed to fetch collections from QuickBase. Please try again."
+            }), 500
+
+        if not collections:
+            logging.warning("No collections data received from QuickBase")
+            return jsonify({
+                "success": False,
+                "message": "No collections data available from QuickBase."
+            }), 400
+
+        # Track changes
+        records_added = 0
+
+        try:
+            # Clear existing records
+            Collection.query.delete()
+
+            # Process all records
+            for invoice in collections:
+                try:
+                    # Create new record with only the fields that exist in the model
+                    new_collection = Collection(
+                        record_id=invoice['record_id'],
+                        invoice_number=invoice['invoice_number'],
+                        invoice_date=invoice['invoice_date'],
+                        due_date=invoice['due_date'],
+                        customer=invoice['customer'],
+                        salesperson=invoice['salesperson'],
+                        balance=invoice['balance'],
+                        notes=invoice.get('notes', ''),
+                        last_sync_time=datetime.now()
+                    )
+                    db.session.add(new_collection)
+                    records_added += 1
+
+                except Exception as e:
+                    logging.error(f"Error processing collection record: {str(e)}")
+                    continue
+
+            # Commit all changes
+            db.session.commit()
+
+            # Update sync time
+            sync_time = datetime.now()
+            sync_record = SyncTime.query.filter_by(sync_type='collections').first()
+            if sync_record:
+                sync_record.last_sync_time = sync_time
+            else:
+                sync_record = SyncTime(sync_type='collections', last_sync_time=sync_time)
+                db.session.add(sync_record)
+            db.session.commit()
+
+            return jsonify({
+                "success": True,
+                "message":f"Successfully synced {records_added} collections.",
+                "sync_time": format_pacific_time_func(sync_time)
+            })
+
+        except Exception as e:
+            db.session.rollback()
+            logging.error(f"Failed to process collections: {str(e)}")
+            return jsonify({
+                "success": False,
+                "message": "Failed to process collections. Please try again."
+            }), 500
+
+    except Exception as e:
+        logging.error(f"Collections sync failed: {str(e)}")
+        return jsonify({
+            "success": False,
+            "message": "An unexpected error occurred during sync. Please try again."
+        }), 500
+
+@main.route('/admin/impersonate/<int:user_id>', methods=['POST'])
+@login_required
+@role_required('ADMIN')
+def impersonate_user(user_id):
+    try:
+        user_to_impersonate = User.query.get_or_404(user_id)
+
+        if user_to_impersonate.email == current_user.email:
+            return jsonify({
+                "success": False,
+                "message": "Cannot impersonate yourself"
+            }), 400
+
+        # Store the admin's ID and clear any existing session data
+        session.clear()
+        session['original_user_id'] = current_user.id
+
+        # Log in as the impersonated user
+        login_user(user_to_impersonate)
+        session.modified = True
+
+        return jsonify({
+            "success": True,
+            "redirect": url_for('main.dashboard')
+        })
+
+    except Exception as e:
+        logging.error(f"Failed to impersonate user: {str(e)}")
+        return jsonify({
+            "success": False,
+            "message": "Failed to impersonate user"
+        }), 500
+
+@main.route('/admin/stop-impersonation', methods=['POST'])
+@login_required
+def stop_impersonation():
+    try:
+        original_user_id = session.pop('original_user_id', None)
+        if original_user_id:
+            original_user = User.query.get(original_user_id)
+            if original_user:
+                login_user(original_user)
+                return jsonify({
+                    "success": True,"redirect": url_for('main.admin_dashboard')
+                })
+
+        # If no original user found, clear session and redirect to login
+        session.clear()
+        return jsonify({
+            "success": False,
+            "message": "No active impersonation session"
+        }), 400
+
+    except Exception as e:
+        logging.error(f"Failed to stop impersonation: {str(e)}")
+        session.clear()  # Clear session even on error
+        return jsonify({
+            "success": False,
+            "message": "Failed to stop impersonation"
+        }), 500
+
+@main.route('/admin/users/<int:user_id>/set-password', methods=['POST'])
+@login_required
+@role_required('ADMIN')
+def set_user_password(user_id):
+    try:
+        if not request.is_json:
+            return jsonify({"success": False, "message": "Invalid request format"}), 400            
+        data = request.get_json()
+        if 'password' not in data:
+            return jsonify({"success": False, "message": "Password is required"}), 400
+
+        user = User.query.get_or_404(user_id)
+
+        if user.email == 'bengillihan@ampowersys.com':
+            return jsonify({"success": False, "message":"Cannot modify admin user password"}), 403
+
+        user.set_password(data['password'])
+        db.session.commit()
+
+        return jsonify({"success": True, "message": "Password updated successfully"})
+    except Exception as e:
+        db.session.rollback()
+        logging.error(f"Failed to set user password: {str(e)}")
+        return jsonify({"success": False, "message":"Failed to update password"}), 500
+
+@main.route('/user/change-password', methods=['POST'])
+@login_required
+def change_password():
+    try:
+        if not request.is_json:
+            return jsonify({"success": False, "message": "Invalid request format"}), 400
+
+        data = request.get_json()
+        if not all(k in data for k in ('current_password', 'new_password')):
+            return jsonify({"success": False, "message": "Missing required fields"}), 400
+
+        if not current_user.check_password(data['current_password']):
+            return jsonify({"success": False, "message": "Current password is incorrect"}), 401
+
+        current_user.set_password(data['new_password'])
+        db.session.commit()
+
+        return jsonify({"success": True, "message": "Password changed successfully"})
+    except Exception as e:
+        db.session.rollback()
+        logging.error(f"Failed to change password: {str(e)}")
+        return jsonify({"success": False, "message": "Failed to change password"}), 500
+
+@main.route('/admin/sync-documentation', methods=['POST'])
+@login_required
+@role_required('ADMIN')
+def sync_documentation():
+    try:
+        # Start a transaction
+        db.session.begin_nested()
+        # Clear existing logs first
+        ChangesLog.query.delete()
+
+        # Add historical changes with deployment information
+        changes = [
+            {
+                "date": "2024-12-01 09:00:00",
+                "description": "Development Start - D2-120124",
+                "details": "Project initialization: Set up development environment, created repository structure, and configured PostgreSQL database"
+            },
+            {
+                "date": "2024-12-03 10:00:00",
+                "description": "Authentication Framework - D2-120324",
+                "details": "Implemented core authentication system with Flask-Login, session management, and basic security measures"
+            },
+            {
+                "date": "2024-12-05 11:00:00",
+                "description": "Database Migration Setup - D2-120524",
+                "details": "Set up Flask-Migrate for database migrations, created initial schema, and implemented User model"
+            },
+            {
+                "date": "2024-12-07 09:00:00",
+                "description": "Initial Prototype Release - D2-120724-A",
+                "details": "Completed initial prototype with login functionality including Bootstrap dark theme, email/password form with validation, basic authentication system, database setup with User model, and password security measures"
+            },
+            {
+                "date": "2024-12-07 10:00:00",
+                "description": "User Management System - D2-120724-B",
+                "details": "Added admin-only user creation, role-based access control, user management features (create, update, delete), and removed public registration"
+            },
+            {
+                "date": "2024-12-07 11:00:00",
+                "description": "QuickBase Integration - D2-120724-C",
+                "details": "Implemented QuickBase API client, user synchronization, automatic user creation/removal, and manual sync trigger in admin dashboard"
+            },
+            {
+                "date": "2024-12-07 12:00:00",
+                "description": "Collections System - D2-120724-D",
+                "details": "Added Collections model, sync functionality, and dashboard integration with database-first approach"
+            },
+            {
+                "date": "2024-12-07 13:00:00",
+                "description": "Mobile Optimization - D2-120724-E",
+                "details": "Updated table CSS with improved mobile responsiveness, including proper table widths and horizontal scrolling"
+            },
+            {
+                "date": "2024-12-0714:00:00",
+                "description": "Job System Enhancement - D2-120724-F",
+                "details": "Updated jobs sorting by completion date to show oldest dates first, renamed 'Sage Comp Date' to 'Estimated Completion Date'"
+            },
+            {
+                "date": "2024-12-07 15:00:00",
+                "description": "Data Visualization - D2-120724-G",
+                "details": "Added month-based filtering with totals display for both Product Orders and Open Jobs tabs"
+            }
+        ]
+
+        for change in changes:
+            log = ChangesLog(
+                date=datetime.strptime(change["date"], "%Y-%m-%d %H:%M:%S"),
+                description=change["description"],
+                details=change["details"]
+            )
+            db.session.add(log)
+
+        # Update sync time for documentation
+        sync_time = datetime.now()
+        sync_record = SyncTime.query.filter_by(sync_type='documentation').first()
+        if sync_record:
+            sync_record.last_sync_time = sync_time
+        else:
+            sync_record = SyncTime(sync_type='documentation', last_sync_time=sync_time)
+            db.session.add(sync_record)
+
+        db.session.commit()
+
+        return jsonify({
+            "success": True,
+            "message": "Changes log populated successfully",
+            "sync_time": format_pacific_time_func(sync_time)
+        })
+    except Exception as e:
+        db.session.rollback()
+        logging.error(f"Failed to sync documentation: {str(e)}")
+        return jsonify({"success": False, "message": str(e)}), 500
+
+@main.route('/admin/sync-changes', methods=['POST'])
+@login_required
+@admin_required
+def sync_changes():
+    try:
+        # Start a transaction
+        db.session.begin_nested()
+
+        # Clear existing logs first
+        ChangesLog.query.delete()
+
+        # Add historical changes with deployment information
+        changes = [
+            {
+                "date": "2024-12-01 09:00:00",
+                "description": "Development Start - D2-120124",
+                "details": "Project initialization: Set up development environment, created repository structure, and configured PostgreSQL database"
+            },
+            {
+                "date": "2024-12-03 10:00:00",
+                "description": "Authentication Framework - D2-120324",
+                "details": "Implemented core authentication system with Flask-Login, session management, and basic security measures"
+            },
+            {
+                "date": "2024-12-05 11:00:00",
+                "description": "Database Migration Setup - D2-120524",
+                "details": "Set up Flask-Migrate for database migrations, created initial schema, and implemented User model"
+            },
+            {
+                "date": "2024-12-07 09:00:00",
+                "description": "Initial Prototype Release - D2-120724-A",
+                "details": "Completed initial prototype with login functionality including Bootstrap dark theme, email/password form with validation, basic authentication system, database setup with User model, and password security measures"
+            },
+            {
+                "date": "2024-12-07 10:00:00",
+                "description": "User Management System - D2-120724-B",
+                "details": "Added admin-only user creation, role-based access control, user management features (create, update, delete), and removed public registration"
+            },
+            {
+                "date": "2024-12-07 11:00:00",
+                "description": "QuickBase Integration - D2-120724-C",
+                "details": "Implemented QuickBase API client, user synchronization, automatic user creation/removal, and manual sync trigger in admin dashboard"
+            },
+            {
+                "date": "2024-12-07 12:00:00",
+                "description": "Collections System - D2-120724-D",
+                "details": "Added Collections model, sync functionality, and dashboard integration with database-first approach"
+            },
+            {
+                "date": "2024-12-07 13:00:00",
+                "description": "Mobile Optimization - D2-120724-E",
+                "details": "Updated table CSS with improved mobile responsiveness, including proper table widths and horizontal scrolling"
+            },
+            {
+                "date": "2024-12-07 14:00:00",
+                "description": "Job System Enhancement - D2-120724-F",
+                "details": "Updated jobs sorting by completion date to show oldest dates first, renamed 'Sage Comp Date' to 'Estimated Completion Date'"
+            },
+            {
+                "date": "2024-12-07 15:00:00",
+                "description": "Data Visualization - D2-120724-G",
+                "details": "Added month-based filtering with totals display for both Product Orders and Open Jobs tabs"
+            }
+        ]
+
+        for change in changes:
+            log = ChangesLog(
+                date=datetime.strptime(change["date"], "%Y-%m-%d %H:%M:%S"),
+                description=change["description"],
+                details=change["details"]
+            )
+            db.session.add(log)
+
+        # Update sync time for documentation
+        sync_time = datetime.now()
+        sync_record = SyncTime.query.filter_by(sync_type='documentation').first()
+        if sync_record:
+            sync_record.last_sync_time = sync_time
+        else:
+            sync_record = SyncTime(sync_type='documentation', last_sync_time=sync_time)
+            db.session.add(sync_record)
+
+        # Commit the nested transaction
+        db.session.commit()
+
+        return jsonify({
+            "success": True,
+            "message": "Changes log populated successfully",
+            "sync_time": format_pacific_time_func(sync_time)
+        })
+
+    except Exception as e:
+        db.session.rollback()
+        logging.error(f"Failed to populate changes log: {str(e)}")
+        return jsonify({
+            "success": False,
+            "message": "Failed to sync documentation. Please try again."
+        }), 500
+
+@current_app.context_processor
+def inject_user_role():
+    # Check if there's an impersonation session and the original user was an admin
+    original_user_id = session.get('original_user_id')
+    is_impersonating = False
+
+    if original_user_id:
+        original_user = User.query.get(original_user_id)
+        is_impersonating = (original_user and
+                              original_user.has_role(UserRole.ADMIN) and
+                              original_user_id != getattr(current_user, 'id', None))
+
+    # Get latest changes for version display
+    changes_log = ChangesLog.query.order_by(ChangesLog.date.desc()).limit(1).all()
+
+    return dict(
+        UserRole=UserRole,
+        is_impersonating=is_impersonating,
+        changes_log=changes_log
+    )
+
+def format_pacific_time_func(dt=None):
+    try:
+        pacific = timezone('US/Pacific')
+        if dt is None:
+            # Use UTC as the starting point and convert to Pacific
+            dt = datetime.utcnow().replace(tzinfo=timezone('UTC')).astimezone(pacific)
+        elif not dt.tzinfo:
+            # For naive datetime, assume it's UTC and convert to Pacific
+            dt = dt.replace(tzinfo=timezone('UTC')).astimezone(pacific)
+        else:
+            # For aware datetime, just convert to Pacific
+            dt = dt.astimezone(pacific)
+        return dt.strftime('%Y-%m-%d %I:%M %p') + ' Pacific'
+    except Exception as e:
+        logging.error(f"Error formatting time: {str(e)}")
+        return "Time not available"
+
+@current_app.template_filter('format_pacific_time')
+def format_pacific_time(dt=None):
+    return format_pacific_time_func(dt)
+
+@current_app.context_processor
+def utility_processor():
+    def now():
+        return datetime.now()
+    return dict(now=now, format_pacific_time=format_pacific_time_func)

@@ -1,0 +1,123 @@
+import os
+import logging
+from datetime import datetime, timedelta
+from dotenv import load_dotenv
+from flask import Flask
+from flask_migrate import Migrate
+from flask_apscheduler import APScheduler
+from pytz import timezone
+from sqlalchemy import text
+from extensions import db, login_manager
+
+# Setup logging
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - [%(filename)s:%(lineno)d] - %(message)s'
+)
+logger = logging.getLogger(__name__)
+
+# Initialize scheduler globally
+scheduler = APScheduler()
+
+def check_required_env_vars():
+    """Check if all required environment variables are set"""
+    required_vars = {
+        'DATABASE_URL': 'PostgreSQL database connection URL',
+        'QUICKBASE_REALM_HOSTNAME': 'QuickBase realm hostname',
+        'QUICKBASE_USER_TOKEN': 'QuickBase API user token',
+        'FLASK_SECRET_KEY': 'Flask application secret key'
+    }
+
+    missing_vars = []
+    for var, description in required_vars.items():
+        if not os.environ.get(var):
+            if var == 'FLASK_SECRET_KEY':
+                import secrets
+                os.environ['FLASK_SECRET_KEY'] = secrets.token_hex(32)
+                logger.info("Generated secure random FLASK_SECRET_KEY")
+            else:
+                missing_vars.append(f"{var} ({description})")
+                logger.error(f"Missing required environment variable: {var}")
+
+    if missing_vars:
+        raise EnvironmentError(f"Missing required environment variables:\n- " + "\n- ".join(missing_vars))
+
+def create_app():
+    """Create and configure the Flask application"""
+    try:
+        # Load environment variables
+        load_dotenv()
+        check_required_env_vars()
+
+        # Create Flask application
+        app = Flask(__name__)
+
+        # Configure database URL with SSL settings
+        database_url = os.environ.get("DATABASE_URL")
+        if database_url and database_url.startswith("postgres://"):
+            database_url = database_url.replace("postgres://", "postgresql://", 1)
+
+        # Add SSL mode if not present
+        if database_url and '?' not in database_url:
+            database_url += "?sslmode=require"
+        elif database_url and 'sslmode' not in database_url:
+            database_url += "&sslmode=require"
+
+        # Application configuration
+        app.config.update(
+            SECRET_KEY=os.environ.get("FLASK_SECRET_KEY"),
+            SQLALCHEMY_DATABASE_URI=database_url,
+            SQLALCHEMY_ENGINE_OPTIONS={
+                "pool_pre_ping": True,
+                "pool_recycle": 300,
+                "pool_timeout": 30,
+                "max_overflow": 5,
+                "connect_args": {
+                    "sslmode": "require",
+                    "connect_timeout": 30
+                }
+            },
+            SQLALCHEMY_TRACK_MODIFICATIONS=False,
+            SESSION_COOKIE_SECURE=True,
+            SESSION_COOKIE_HTTPONLY=True,
+            SESSION_COOKIE_SAMESITE='Lax',
+            PERMANENT_SESSION_LIFETIME=timedelta(days=31),
+        )
+
+        # Initialize extensions
+        logger.info("Initializing database")
+        db.init_app(app)
+
+        logger.info("Initializing migrations")
+        Migrate(app, db)
+
+        logger.info("Initializing login manager")
+        login_manager.init_app(app)
+        login_manager.login_view = 'main.login'
+
+        # Register blueprint routes
+        with app.app_context():
+            from routes import main as main_blueprint
+            app.register_blueprint(main_blueprint)
+
+            # Initialize database tables
+            db.create_all()
+            logger.info("Database tables initialized")
+
+            # Initialize scheduler
+            scheduler.init_app(app)
+            scheduler.start()
+            logger.info("Scheduler started")
+
+        return app
+
+    except Exception as e:
+        logger.error(f"Failed to create application: {str(e)}", exc_info=True)
+        raise
+
+# Create the application instance
+app = create_app()
+
+if __name__ == '__main__':
+    port = int(os.environ.get("PORT", 5000))
+    app.run(host='0.0.0.0', port=port)

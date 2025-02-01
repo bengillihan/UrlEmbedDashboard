@@ -1,7 +1,7 @@
 export const DASHBOARD_URLS = [
   {
     id: 'sales',
-    url: 'https://aps.work/ssp',
+    url: '/api/ssp-proxy',
     title: 'Salesflow'
   },
   {
