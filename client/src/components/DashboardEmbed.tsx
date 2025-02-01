@@ -7,9 +7,10 @@ import { Button } from '@/components/ui/button';
 interface DashboardEmbedProps {
   url: string;
   title: string;
+  loginUrl: string;
 }
 
-export function DashboardEmbed({ url, title }: DashboardEmbedProps) {
+export function DashboardEmbed({ url, title, loginUrl }: DashboardEmbedProps) {
   const [isLoading, setIsLoading] = useState(true);
   const [hasError, setHasError] = useState(false);
   const [key, setKey] = useState(0);
@@ -25,7 +26,7 @@ export function DashboardEmbed({ url, title }: DashboardEmbedProps) {
   };
 
   const handleLogin = () => {
-    window.open(url, '_blank', 'noopener,noreferrer');
+    window.open(loginUrl, '_blank', 'noopener,noreferrer');
   };
 
   const handleRefresh = () => {
@@ -68,7 +69,7 @@ export function DashboardEmbed({ url, title }: DashboardEmbedProps) {
           </div>
         )}
 
-        <iframe 
+        <iframe
           key={key}
           src={url}
           title={title}
@@ -76,9 +77,7 @@ export function DashboardEmbed({ url, title }: DashboardEmbedProps) {
           onLoad={handleLoad}
           onError={handleError}
           allow="fullscreen"
-          sandbox="allow-same-origin allow-scripts allow-popups allow-forms allow-top-navigation allow-storage-access-by-user-activation"
-          referrerPolicy="no-referrer"
-          credentialless="true"
+          sandbox="allow-same-origin allow-scripts allow-popups allow-forms allow-top-navigation"
         />
       </CardContent>
     </Card>

@@ -18,6 +18,7 @@ export function DashboardGrid() {
             <DashboardEmbed 
               url={dashboard.url} 
               title={dashboard.title}
+              loginUrl={dashboard.loginUrl}
             />
           </TabsContent>
         ))}
