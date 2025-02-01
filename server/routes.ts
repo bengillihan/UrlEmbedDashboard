@@ -1,19 +1,35 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
+import { createProxyMiddleware } from 'http-proxy-middleware';
 
 export function registerRoutes(app: Express): Server {
-  // Add CORS proxy route for SSP
-  app.use('/api/ssp-proxy', (req, res) => {
-    // Forward requests to SSP with proper headers
-    res.header('Access-Control-Allow-Origin', '*');
-    res.header('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
-    res.header('Access-Control-Allow-Headers', 'Content-Type');
-    res.header('X-Frame-Options', 'ALLOW-FROM https://aps.work/');
-    res.header('Access-Control-Allow-Credentials', 'true');
-
-    // Forward the request
-    res.redirect('https://aps.work/ssp' + req.url);
-  });
+  // Add SSP proxy with proper cookie handling
+  app.use('/api/ssp-proxy', createProxyMiddleware({
+    target: 'https://aps.work',
+    changeOrigin: true,
+    pathRewrite: {
+      '^/api/ssp-proxy': '/ssp'  // rewrite path
+    },
+    cookieDomainRewrite: {
+      '*': '' // rewrite cookie domain to match our domain
+    },
+    secure: true,
+    xfwd: true,
+    withCredentials: true,
+    onProxyReq: (proxyReq, req) => {
+      // Forward original headers
+      if (req.headers.cookie) {
+        proxyReq.setHeader('Cookie', req.headers.cookie);
+      }
+    },
+    onProxyRes: function(proxyRes, req, res) {
+      // Ensure proper CORS headers
+      proxyRes.headers['access-control-allow-origin'] = req.headers.origin || '*';
+      proxyRes.headers['access-control-allow-credentials'] = 'true';
+      proxyRes.headers['access-control-allow-methods'] = 'GET, POST, OPTIONS';
+      proxyRes.headers['access-control-allow-headers'] = 'Content-Type, Cookie, X-Requested-With';
+    }
+  }));
 
   const httpServer = createServer(app);
   return httpServer;

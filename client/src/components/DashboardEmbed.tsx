@@ -78,9 +78,8 @@ export function DashboardEmbed({ url, title }: DashboardEmbedProps) {
           allow="fullscreen"
           sandbox="allow-same-origin allow-scripts allow-popups allow-forms allow-top-navigation allow-storage-access-by-user-activation"
           referrerPolicy="no-referrer"
-          {...(url.includes('aps.work/ssp') && {
-            credentials: 'include',
-            crossOrigin: 'use-credentials'
+          {...(url.includes('ssp') && {
+            credentialsPolicy: "include"
           })}
         />
       </CardContent>
