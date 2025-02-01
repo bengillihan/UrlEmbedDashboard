@@ -1,7 +1,7 @@
 export const DASHBOARD_URLS = [
   {
     id: 'sales',
-    url: 'https://sales-service-portal-bdgillihan.replit.app/dashboard',
+    url: 'https://aps.work/ssp',
     title: 'Salesflow'
   },
   {
