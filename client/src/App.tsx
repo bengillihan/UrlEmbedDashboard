@@ -2,24 +2,13 @@ import { Switch, Route } from "wouter";
 import { Home } from "@/pages/Home";
 import { Card, CardContent } from "@/components/ui/card";
 import { AlertCircle } from "lucide-react";
-import { ProtectedRoute } from "@/lib/protected-route";
-import AuthPage from "@/pages/auth-page";
-import { AuthProvider } from "@/hooks/use-auth";
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-
-const queryClient = new QueryClient();
 
 function App() {
   return (
-    <QueryClientProvider client={queryClient}>
-      <AuthProvider>
-        <Switch>
-          <ProtectedRoute path="/" component={Home} />
-          <Route path="/auth" component={AuthPage} />
-          <Route component={NotFound} />
-        </Switch>
-      </AuthProvider>
-    </QueryClientProvider>
+    <Switch>
+      <Route path="/" component={Home} />
+      <Route component={NotFound} />
+    </Switch>
   );
 }
 

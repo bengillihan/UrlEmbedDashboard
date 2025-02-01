@@ -25,7 +25,7 @@ export function DashboardEmbed({ url, title }: DashboardEmbedProps) {
   };
 
   const handleLogin = () => {
-    window.open(url, '_blank');
+    window.open(url, '_blank', 'noopener,noreferrer');
   };
 
   const handleRefresh = () => {
@@ -47,15 +47,15 @@ export function DashboardEmbed({ url, title }: DashboardEmbedProps) {
           <div className="absolute inset-0 flex items-center justify-center bg-gray-50">
             <div className="text-center">
               <AlertCircle className="h-12 w-12 text-yellow-500 mx-auto mb-4" />
-              <h3 className="text-lg font-semibold text-gray-900 mb-2">Authentication Required</h3>
+              <h3 className="text-lg font-semibold text-gray-900 mb-2">Access Required</h3>
               <p className="text-sm text-gray-600 mb-4">
-                Please log in to view the {title} dashboard
+                Please log in to {title} to view this dashboard
               </p>
               <Button onClick={handleLogin}>
-                Open {title} in New Tab
+                Open {title} Login Page
               </Button>
               <p className="text-sm text-gray-500 mt-4">
-                After logging in, return to this tab and click refresh below
+                After logging in, return here and click refresh below
               </p>
               <Button 
                 onClick={handleRefresh}
@@ -78,9 +78,7 @@ export function DashboardEmbed({ url, title }: DashboardEmbedProps) {
           allow="fullscreen"
           sandbox="allow-same-origin allow-scripts allow-popups allow-forms allow-top-navigation allow-storage-access-by-user-activation"
           referrerPolicy="no-referrer"
-          {...(url.includes('ssp') && {
-            credentialsPolicy: "include"
-          })}
+          credentialless="true"
         />
       </CardContent>
     </Card>
