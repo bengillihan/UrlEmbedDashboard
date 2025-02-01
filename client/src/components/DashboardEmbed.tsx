@@ -10,12 +10,6 @@ interface DashboardEmbedProps {
 }
 
 export function DashboardEmbed({ url, title }: DashboardEmbedProps) {
-  // If it's SSP, redirect directly to it
-  if (url.includes('aps.work/ssp')) {
-    window.location.href = url;
-    return null;
-  }
-
   const [isLoading, setIsLoading] = useState(true);
   const [hasError, setHasError] = useState(false);
   const [key, setKey] = useState(0);
@@ -39,6 +33,26 @@ export function DashboardEmbed({ url, title }: DashboardEmbedProps) {
     setIsLoading(true);
     setHasError(false);
   };
+
+  // Special handling for SSP - show a button instead
+  if (url.includes('aps.work/ssp')) {
+    return (
+      <Card className="w-full h-full">
+        <CardContent className="flex items-center justify-center h-full">
+          <div className="text-center">
+            <h3 className="text-lg font-semibold text-gray-900 mb-4">Sales Service Portal</h3>
+            <Button 
+              onClick={() => window.open(url, '_blank')}
+              size="lg"
+              className="px-8"
+            >
+              Open Sales Service Portal
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
 
   return (
     <Card className="w-full h-full">
