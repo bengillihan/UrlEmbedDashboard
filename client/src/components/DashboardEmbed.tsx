@@ -34,26 +34,6 @@ export function DashboardEmbed({ url, title }: DashboardEmbedProps) {
     setHasError(false);
   };
 
-  // Special handling for SSP - show a button instead
-  if (url.includes('aps.work/ssp')) {
-    return (
-      <Card className="w-full h-full">
-        <CardContent className="flex items-center justify-center h-full">
-          <div className="text-center">
-            <h3 className="text-lg font-semibold text-gray-900 mb-4">Sales Service Portal</h3>
-            <Button 
-              onClick={() => window.open(url, '_blank')}
-              size="lg"
-              className="px-8"
-            >
-              Open Sales Service Portal
-            </Button>
-          </div>
-        </CardContent>
-      </Card>
-    );
-  }
-
   return (
     <Card className="w-full h-full">
       <CardContent className="p-0 h-full relative">
@@ -96,7 +76,8 @@ export function DashboardEmbed({ url, title }: DashboardEmbedProps) {
           onLoad={handleLoad}
           onError={handleError}
           allow="fullscreen"
-          sandbox="allow-same-origin allow-scripts allow-popups allow-forms"
+          sandbox="allow-same-origin allow-scripts allow-popups allow-forms allow-top-navigation-by-user-activation allow-storage-access-by-user-activation"
+          referrerPolicy="no-referrer"
         />
       </CardContent>
     </Card>
