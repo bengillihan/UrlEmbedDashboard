@@ -10,12 +10,15 @@ interface DashboardEmbedProps {
 }
 
 export function DashboardEmbed({ url, title }: DashboardEmbedProps) {
+  // If it's SSP, redirect directly to it
+  if (url.includes('aps.work/ssp')) {
+    window.location.href = url;
+    return null;
+  }
+
   const [isLoading, setIsLoading] = useState(true);
   const [hasError, setHasError] = useState(false);
-  const [key, setKey] = useState(0); // Used to force iframe refresh
-
-  // Check if it's a Replit app
-  const isReplitApp = url.includes('.replit.app') || url.includes('aps.work');
+  const [key, setKey] = useState(0);
 
   const handleLoad = () => {
     setIsLoading(false);
@@ -28,17 +31,11 @@ export function DashboardEmbed({ url, title }: DashboardEmbedProps) {
   };
 
   const handleLogin = () => {
-    // For Replit apps, open in same window to maintain session
-    if (isReplitApp) {
-      window.location.href = url;
-    } else {
-      // For other services, open in new tab
-      window.open(url, '_blank');
-    }
+    window.open(url, '_blank');
   };
 
   const handleRefresh = () => {
-    setKey(prev => prev + 1); // Force iframe refresh
+    setKey(prev => prev + 1);
     setIsLoading(true);
     setHasError(false);
   };
@@ -61,22 +58,18 @@ export function DashboardEmbed({ url, title }: DashboardEmbedProps) {
                 Please log in to view the {title} dashboard
               </p>
               <Button onClick={handleLogin}>
-                {isReplitApp ? 'Log in to' : 'Open'} {title}
+                Open {title} in New Tab
               </Button>
-              {!isReplitApp && (
-                <>
-                  <p className="text-sm text-gray-500 mt-4">
-                    After logging in, return to this tab and click refresh below
-                  </p>
-                  <Button 
-                    onClick={handleRefresh}
-                    variant="outline"
-                    className="mt-2"
-                  >
-                    Refresh Dashboard
-                  </Button>
-                </>
-              )}
+              <p className="text-sm text-gray-500 mt-4">
+                After logging in, return to this tab and click refresh below
+              </p>
+              <Button 
+                onClick={handleRefresh}
+                variant="outline"
+                className="mt-2"
+              >
+                Refresh Dashboard
+              </Button>
             </div>
           </div>
         )}
@@ -89,11 +82,7 @@ export function DashboardEmbed({ url, title }: DashboardEmbedProps) {
           onLoad={handleLoad}
           onError={handleError}
           allow="fullscreen"
-          sandbox={isReplitApp 
-            ? "allow-same-origin allow-scripts allow-popups allow-forms allow-modals allow-downloads allow-storage-access-by-user-activation allow-top-navigation"
-            : "allow-same-origin allow-scripts allow-popups allow-forms"
-          }
-          {...(isReplitApp && { credentialless: false })}
+          sandbox="allow-same-origin allow-scripts allow-popups allow-forms"
         />
       </CardContent>
     </Card>
