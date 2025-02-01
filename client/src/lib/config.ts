@@ -1,7 +1,7 @@
 export const DASHBOARD_URLS = [
   {
     id: 'sales',
-    url: '/api/ssp-proxy',
+    url: 'https://sales-service-portal-bdgillihan.replit.app/',
     title: 'Salesflow'
   },
   {
