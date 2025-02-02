@@ -1,9 +1,9 @@
 export const DASHBOARD_URLS = [
   {
     id: 'sales',
-    url: '/api/salesflow-proxy/',
+    url: '/api/ssp-proxy/',
     title: 'Salesflow',
-    loginUrl: 'https://sales-service-portal-bdgillihan.replit.app/'
+    loginUrl: 'https://aps.work/ssp'
   },
   {
     id: 'powerbi',
@@ -16,12 +16,6 @@ export const DASHBOARD_URLS = [
     url: '/api/quickbase-proxy/db/bp5hq3uqm/813bccff-c7f4-4298-aa2d-aa36e57ea55e',
     title: 'QuickBase',
     loginUrl: 'https://americanpower.quickbase.com/db/bp5hq3uqm/813bccff-c7f4-4298-aa2d-aa36e57ea55e'
-  },
-  {
-    id: 'test-salesflow',
-    url: '/api/salesflow-proxy/',
-    title: 'Test Salesflow',
-    loginUrl: 'https://sales-dashboard-v-2-bdgillihan.replit.app'
   },
   {
     id: 'table-syncs',
