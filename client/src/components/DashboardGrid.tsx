@@ -19,6 +19,7 @@ export function DashboardGrid() {
               url={dashboard.url} 
               title={dashboard.title}
               loginUrl={dashboard.loginUrl}
+              openInNewWindow={dashboard.openInNewWindow}
             />
           </TabsContent>
         ))}

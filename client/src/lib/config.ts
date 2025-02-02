@@ -3,7 +3,8 @@ export const DASHBOARD_URLS = [
     id: 'sales',
     url: '/api/ssp-proxy/',
     title: 'Salesflow',
-    loginUrl: 'https://aps.work/ssp'
+    loginUrl: 'https://aps.work/ssp',
+    openInNewWindow: true
   },
   {
     id: 'powerbi',
