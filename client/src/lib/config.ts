@@ -8,7 +8,7 @@ export const DASHBOARD_URLS = [
   },
   {
     id: 'powerbi',
-    url: '/api/powerbi-proxy/reportEmbed',
+    url: '/api/powerbi-proxy/reportEmbed?reportId=db4665f9-bb0f-42ef-ac87-a0172e6573fb&autoAuth=true&ctid=4fa2dc50-679e-4e7f-9953-0b4a5c3291be',
     title: 'PowerBI',
     loginUrl: 'https://app.powerbi.com/reportEmbed?reportId=db4665f9-bb0f-42ef-ac87-a0172e6573fb&autoAuth=true&ctid=4fa2dc50-679e-4e7f-9953-0b4a5c3291be'
   },
@@ -25,7 +25,7 @@ export const DASHBOARD_URLS = [
     loginUrl: 'https://app.powerbi.com/reportEmbed',
     embedConfig: {
       reportId: 'db4665f9-bb0f-42ef-ac87-a0172e6573fb',
-      embedUrl: 'https://app.powerbi.com/reportEmbed',
+      embedUrl: 'https://app.powerbi.com/reportEmbed?reportId=db4665f9-bb0f-42ef-ac87-a0172e6573fb&autoAuth=true&ctid=4fa2dc50-679e-4e7f-9953-0b4a5c3291be',
       tokenType: 'Embed'
     }
   },
