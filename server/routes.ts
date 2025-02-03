@@ -3,104 +3,77 @@ import { createServer, type Server } from "http";
 import { createProxyMiddleware } from 'http-proxy-middleware';
 
 export function registerRoutes(app: Express): Server {
-  // Add SSP proxy with proper cookie handling
+  // Configure common CORS headers middleware
+  app.use((req, res, next) => {
+    res.header('Access-Control-Allow-Credentials', 'true');
+    res.header('Access-Control-Allow-Origin', req.headers.origin || '*');
+    res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
+    res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With');
+    if (req.method === 'OPTIONS') {
+      return res.sendStatus(200);
+    }
+    next();
+  });
+
+  // Add SSP proxy with simplified configuration
   app.use('/api/ssp-proxy', createProxyMiddleware({
     target: 'https://aps.work',
     changeOrigin: true,
-    pathRewrite: {
-      '^/api/ssp-proxy': '/ssp'  // rewrite path
-    },
-    cookieDomainRewrite: {
-      '*': '' // rewrite cookie domain to match our domain
-    },
+    pathRewrite: { '^/api/ssp-proxy': '/ssp' },
+    cookieDomainRewrite: '*',
     secure: true,
-    xfwd: true,
-    withCredentials: true,
-    onProxyReq: (proxyReq, req) => {
-      // Forward original headers
+    headers: {
+      'X-Forwarded-Host': 'aps.work',
+      'X-Forwarded-Proto': 'https'
+    },
+    logLevel: 'debug',
+    onProxyReq: (proxyReq, req, res) => {
+      // Log request details for debugging
+      console.log('[SSP Proxy] Request headers:', req.headers);
       if (req.headers.cookie) {
         proxyReq.setHeader('Cookie', req.headers.cookie);
       }
-      if (req.headers.origin) {
-        proxyReq.setHeader('Origin', req.headers.origin);
-      }
-      if (req.headers.referer) {
-        proxyReq.setHeader('Referer', req.headers.referer);
-      }
     },
-    onProxyRes: function(proxyRes, req, res) {
-      // Ensure proper CORS headers
-      proxyRes.headers['access-control-allow-origin'] = req.headers.origin || '*';
-      proxyRes.headers['access-control-allow-credentials'] = 'true';
-      proxyRes.headers['access-control-allow-methods'] = 'GET, POST, PUT, DELETE, OPTIONS';
-      proxyRes.headers['access-control-allow-headers'] = 'Content-Type, Cookie, X-Requested-With, Authorization';
-      proxyRes.headers['access-control-expose-headers'] = 'Set-Cookie';
+    onProxyRes: (proxyRes, req, res) => {
+      // Log response details for debugging
+      console.log('[SSP Proxy] Response headers:', proxyRes.headers);
+    },
+    onError: (err, req, res) => {
+      console.error('[SSP Proxy] Error:', err);
+      res.writeHead(500, {
+        'Content-Type': 'text/plain'
+      });
+      res.end('Something went wrong with SSP proxy: ' + err.message);
     }
   }));
 
-  // PowerBI proxy with enhanced cookie handling
+  // PowerBI proxy with simplified configuration
   app.use('/api/powerbi-proxy', createProxyMiddleware({
     target: 'https://app.powerbi.com',
     changeOrigin: true,
-    pathRewrite: {
-      '^/api/powerbi-proxy': '/'
-    },
-    cookieDomainRewrite: {
-      '*': '' // Rewrite cookie domain to match our domain
-    },
+    pathRewrite: { '^/api/powerbi-proxy': '/' },
+    cookieDomainRewrite: '*',
     secure: true,
-    xfwd: true,
-    withCredentials: true,
-    onProxyReq: (proxyReq, req) => {
+    headers: {
+      'X-Forwarded-Host': 'app.powerbi.com',
+      'X-Forwarded-Proto': 'https'
+    },
+    logLevel: 'debug',
+    onProxyReq: (proxyReq, req, res) => {
+      console.log('[PowerBI Proxy] Request headers:', req.headers);
       if (req.headers.cookie) {
         proxyReq.setHeader('Cookie', req.headers.cookie);
       }
-      if (req.headers.origin) {
-        proxyReq.setHeader('Origin', req.headers.origin);
-      }
-      if (req.headers.referer) {
-        proxyReq.setHeader('Referer', req.headers.referer);
-      }
     },
     onProxyRes: (proxyRes, req, res) => {
-      proxyRes.headers['access-control-allow-origin'] = req.headers.origin || '*';
-      proxyRes.headers['access-control-allow-credentials'] = 'true';
-      proxyRes.headers['access-control-allow-methods'] = 'GET, POST, PUT, DELETE, OPTIONS';
-      proxyRes.headers['access-control-allow-headers'] = 'Content-Type, Cookie, X-Requested-With, Authorization';
-      proxyRes.headers['access-control-expose-headers'] = 'Set-Cookie';
-    }
-  }));
-
-  // Salesflow proxy with enhanced cookie handling
-  app.use('/api/salesflow-proxy', createProxyMiddleware({
-    target: 'https://sales-service-portal-bdgillihan.replit.app',
-    changeOrigin: true,
-    pathRewrite: {
-      '^/api/salesflow-proxy': '/'
+      console.log('[PowerBI Proxy] Response headers:', proxyRes.headers);
     },
-    cookieDomainRewrite: {
-      '*': '' // Rewrite cookie domain to match our domain
-    },
-    secure: true,
-    xfwd: true,
-    withCredentials: true,
-    onProxyReq: (proxyReq, req) => {
-      if (req.headers.cookie) {
-        proxyReq.setHeader('Cookie', req.headers.cookie);
-      }
-      if (req.headers.origin) {
-        proxyReq.setHeader('Origin', req.headers.origin);
-      }
-      if (req.headers.referer) {
-        proxyReq.setHeader('Referer', req.headers.referer);
-      }
-    },
-    onProxyRes: (proxyRes, req, res) => {
-      proxyRes.headers['access-control-allow-origin'] = req.headers.origin || '*';
-      proxyRes.headers['access-control-allow-credentials'] = 'true';
-      proxyRes.headers['access-control-allow-methods'] = 'GET, POST, PUT, DELETE, OPTIONS';
-      proxyRes.headers['access-control-allow-headers'] = 'Content-Type, Cookie, X-Requested-With, Authorization';
-      proxyRes.headers['access-control-expose-headers'] = 'Set-Cookie';
+    onError: (err, req, res) => {
+      console.error('[PowerBI Proxy] Error:', err);
+      res.writeHead(500, {
+        'Content-Type': 'text/plain'
+      });
+      res.end('Something went wrong with PowerBI proxy: ' + err.message);
     }
   }));
 

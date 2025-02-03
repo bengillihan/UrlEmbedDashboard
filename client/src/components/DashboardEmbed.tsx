@@ -1,9 +1,10 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { AlertCircle, ExternalLink } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { PowerBIEmbed } from './PowerBIEmbed';
+import { useToast } from '@/hooks/use-toast';
 
 interface DashboardEmbedProps {
   url: string;
@@ -21,15 +22,23 @@ export function DashboardEmbed({ url, title, loginUrl, openInNewWindow = false, 
   const [isLoading, setIsLoading] = useState(true);
   const [hasError, setHasError] = useState(false);
   const [key, setKey] = useState(0);
+  const { toast } = useToast();
 
   const handleLoad = () => {
+    console.log(`${title} dashboard loaded successfully`);
     setIsLoading(false);
     setHasError(false);
   };
 
-  const handleError = () => {
+  const handleError = (error: Event) => {
+    console.error(`${title} dashboard error:`, error);
     setIsLoading(false);
     setHasError(true);
+    toast({
+      title: "Dashboard Error",
+      description: `Failed to load ${title} dashboard. Please try refreshing or logging in again.`,
+      variant: "destructive",
+    });
   };
 
   const handleOpenDashboard = () => {
@@ -110,10 +119,9 @@ export function DashboardEmbed({ url, title, loginUrl, openInNewWindow = false, 
           onLoad={handleLoad}
           onError={handleError}
           allow="fullscreen"
-          sandbox="allow-same-origin allow-scripts allow-popups allow-forms allow-top-navigation allow-storage-access-by-user-activation"
+          sandbox="allow-same-origin allow-scripts allow-popups allow-forms allow-top-navigation allow-popups-to-escape-sandbox"
           referrerPolicy="no-referrer-when-downgrade"
           loading="lazy"
-          credentialless={false}
         />
       </CardContent>
     </Card>
