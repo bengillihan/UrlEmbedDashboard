@@ -13,6 +13,12 @@ export const DASHBOARD_URLS = [
     loginUrl: 'https://app.powerbi.com/reportEmbed?reportId=db4665f9-bb0f-42ef-ac87-a0172e6573fb&autoAuth=true&ctid=4fa2dc50-679e-4e7f-9953-0b4a5c3291be'
   },
   {
+    id: 'powerbi-full',
+    url: 'https://app.powerbi.com/groups/62f11417-9444-43af-b88e-1e48c1ff3ff5/reports/db4665f9-bb0f-42ef-ac87-a0172e6573fb/500c1df4554eed48d7b2?experience=power-bi',
+    title: 'PowerBI Full Test',
+    loginUrl: 'https://app.powerbi.com/groups/62f11417-9444-43af-b88e-1e48c1ff3ff5/reports/db4665f9-bb0f-42ef-ac87-a0172e6573fb/500c1df4554eed48d7b2?experience=power-bi'
+  },
+  {
     id: 'quickbase',
     url: '/api/quickbase-proxy/db/bp5hq3uqm/813bccff-c7f4-4298-aa2d-aa36e57ea55e',
     title: 'QuickBase',
