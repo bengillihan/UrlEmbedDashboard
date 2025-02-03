@@ -20,6 +20,7 @@ export function DashboardGrid() {
               title={dashboard.title}
               loginUrl={dashboard.loginUrl}
               openInNewWindow={dashboard.openInNewWindow}
+              embedConfig={'embedConfig' in dashboard ? dashboard.embedConfig : undefined}
             />
           </TabsContent>
         ))}

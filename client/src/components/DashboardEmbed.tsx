@@ -3,15 +3,21 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { AlertCircle, ExternalLink } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { PowerBIEmbed } from './PowerBIEmbed';
 
 interface DashboardEmbedProps {
   url: string;
   title: string;
   loginUrl: string;
   openInNewWindow?: boolean;
+  embedConfig?: {
+    reportId: string;
+    embedUrl: string;
+    tokenType: string;
+  };
 }
 
-export function DashboardEmbed({ url, title, loginUrl, openInNewWindow = false }: DashboardEmbedProps) {
+export function DashboardEmbed({ url, title, loginUrl, openInNewWindow = false, embedConfig }: DashboardEmbedProps) {
   const [isLoading, setIsLoading] = useState(true);
   const [hasError, setHasError] = useState(false);
   const [key, setKey] = useState(0);
@@ -49,6 +55,16 @@ export function DashboardEmbed({ url, title, loginUrl, openInNewWindow = false }
           </div>
         </CardContent>
       </Card>
+    );
+  }
+
+  if (embedConfig) {
+    return (
+      <PowerBIEmbed
+        accessToken="your_access_token_here" // This should be fetched from your backend
+        embedUrl={embedConfig.embedUrl}
+        reportId={embedConfig.reportId}
+      />
     );
   }
 

@@ -19,6 +19,17 @@ export const DASHBOARD_URLS = [
     loginUrl: 'https://app.powerbi.com/groups/62f11417-9444-43af-b88e-1e48c1ff3ff5/reports/db4665f9-bb0f-42ef-ac87-a0172e6573fb/500c1df4554eed48d7b2?experience=power-bi'
   },
   {
+    id: 'powerbi-embed',
+    url: '/api/powerbi-proxy/reportEmbed',
+    title: 'Embed PowerBI Test',
+    loginUrl: 'https://app.powerbi.com/reportEmbed',
+    embedConfig: {
+      reportId: 'db4665f9-bb0f-42ef-ac87-a0172e6573fb',
+      embedUrl: 'https://app.powerbi.com/reportEmbed',
+      tokenType: 'Embed'
+    }
+  },
+  {
     id: 'quickbase',
     url: '/api/quickbase-proxy/db/bp5hq3uqm/813bccff-c7f4-4298-aa2d-aa36e57ea55e',
     title: 'QuickBase',
