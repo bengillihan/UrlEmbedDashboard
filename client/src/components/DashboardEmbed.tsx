@@ -110,7 +110,10 @@ export function DashboardEmbed({ url, title, loginUrl, openInNewWindow = false, 
           onLoad={handleLoad}
           onError={handleError}
           allow="fullscreen"
-          sandbox="allow-same-origin allow-scripts allow-popups allow-forms allow-top-navigation"
+          sandbox="allow-same-origin allow-scripts allow-popups allow-forms allow-top-navigation allow-storage-access-by-user-activation"
+          referrerPolicy="no-referrer-when-downgrade"
+          loading="lazy"
+          credentialless={false}
         />
       </CardContent>
     </Card>

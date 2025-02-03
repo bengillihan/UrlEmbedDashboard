@@ -21,16 +21,57 @@ export function registerRoutes(app: Express): Server {
       if (req.headers.cookie) {
         proxyReq.setHeader('Cookie', req.headers.cookie);
       }
+      if (req.headers.origin) {
+        proxyReq.setHeader('Origin', req.headers.origin);
+      }
+      if (req.headers.referer) {
+        proxyReq.setHeader('Referer', req.headers.referer);
+      }
     },
     onProxyRes: function(proxyRes, req, res) {
       // Ensure proper CORS headers
       proxyRes.headers['access-control-allow-origin'] = req.headers.origin || '*';
       proxyRes.headers['access-control-allow-credentials'] = 'true';
-      proxyRes.headers['access-control-allow-methods'] = 'GET, POST, OPTIONS';
-      proxyRes.headers['access-control-allow-headers'] = 'Content-Type, Cookie, X-Requested-With';
+      proxyRes.headers['access-control-allow-methods'] = 'GET, POST, PUT, DELETE, OPTIONS';
+      proxyRes.headers['access-control-allow-headers'] = 'Content-Type, Cookie, X-Requested-With, Authorization';
+      proxyRes.headers['access-control-expose-headers'] = 'Set-Cookie';
     }
   }));
-  // Proxy middleware configuration for Salesflow
+
+  // PowerBI proxy with enhanced cookie handling
+  app.use('/api/powerbi-proxy', createProxyMiddleware({
+    target: 'https://app.powerbi.com',
+    changeOrigin: true,
+    pathRewrite: {
+      '^/api/powerbi-proxy': '/'
+    },
+    cookieDomainRewrite: {
+      '*': '' // Rewrite cookie domain to match our domain
+    },
+    secure: true,
+    xfwd: true,
+    withCredentials: true,
+    onProxyReq: (proxyReq, req) => {
+      if (req.headers.cookie) {
+        proxyReq.setHeader('Cookie', req.headers.cookie);
+      }
+      if (req.headers.origin) {
+        proxyReq.setHeader('Origin', req.headers.origin);
+      }
+      if (req.headers.referer) {
+        proxyReq.setHeader('Referer', req.headers.referer);
+      }
+    },
+    onProxyRes: (proxyRes, req, res) => {
+      proxyRes.headers['access-control-allow-origin'] = req.headers.origin || '*';
+      proxyRes.headers['access-control-allow-credentials'] = 'true';
+      proxyRes.headers['access-control-allow-methods'] = 'GET, POST, PUT, DELETE, OPTIONS';
+      proxyRes.headers['access-control-allow-headers'] = 'Content-Type, Cookie, X-Requested-With, Authorization';
+      proxyRes.headers['access-control-expose-headers'] = 'Set-Cookie';
+    }
+  }));
+
+  // Salesflow proxy with enhanced cookie handling
   app.use('/api/salesflow-proxy', createProxyMiddleware({
     target: 'https://sales-service-portal-bdgillihan.replit.app',
     changeOrigin: true,
@@ -42,68 +83,24 @@ export function registerRoutes(app: Express): Server {
     },
     secure: true,
     xfwd: true,
+    withCredentials: true,
     onProxyReq: (proxyReq, req) => {
-      // Forward cookies
       if (req.headers.cookie) {
         proxyReq.setHeader('Cookie', req.headers.cookie);
       }
-    },
-    onProxyRes: (proxyRes, req, res) => {
-      // Handle CORS and cookie settings
-      proxyRes.headers['access-control-allow-origin'] = req.headers.origin || '*';
-      proxyRes.headers['access-control-allow-credentials'] = 'true';
-      proxyRes.headers['access-control-allow-methods'] = 'GET, POST, OPTIONS';
-      proxyRes.headers['access-control-allow-headers'] = 'Content-Type, Cookie, X-Requested-With';
-    }
-  }));
-
-  // PowerBI proxy
-  app.use('/api/powerbi-proxy', createProxyMiddleware({
-    target: 'https://app.powerbi.com',
-    changeOrigin: true,
-    pathRewrite: {
-      '^/api/powerbi-proxy': '/'
-    },
-    cookieDomainRewrite: {
-      '*': ''
-    },
-    secure: true,
-    xfwd: true,
-    onProxyReq: (proxyReq, req) => {
-      if (req.headers.cookie) {
-        proxyReq.setHeader('Cookie', req.headers.cookie);
+      if (req.headers.origin) {
+        proxyReq.setHeader('Origin', req.headers.origin);
+      }
+      if (req.headers.referer) {
+        proxyReq.setHeader('Referer', req.headers.referer);
       }
     },
     onProxyRes: (proxyRes, req, res) => {
       proxyRes.headers['access-control-allow-origin'] = req.headers.origin || '*';
       proxyRes.headers['access-control-allow-credentials'] = 'true';
-      proxyRes.headers['access-control-allow-methods'] = 'GET, POST, OPTIONS';
-      proxyRes.headers['access-control-allow-headers'] = 'Content-Type, Cookie, X-Requested-With';
-    }
-  }));
-
-  // QuickBase proxy
-  app.use('/api/quickbase-proxy', createProxyMiddleware({
-    target: 'https://americanpower.quickbase.com',
-    changeOrigin: true,
-    pathRewrite: {
-      '^/api/quickbase-proxy': '/'
-    },
-    cookieDomainRewrite: {
-      '*': ''
-    },
-    secure: true,
-    xfwd: true,
-    onProxyReq: (proxyReq, req) => {
-      if (req.headers.cookie) {
-        proxyReq.setHeader('Cookie', req.headers.cookie);
-      }
-    },
-    onProxyRes: (proxyRes, req, res) => {
-      proxyRes.headers['access-control-allow-origin'] = req.headers.origin || '*';
-      proxyRes.headers['access-control-allow-credentials'] = 'true';
-      proxyRes.headers['access-control-allow-methods'] = 'GET, POST, OPTIONS';
-      proxyRes.headers['access-control-allow-headers'] = 'Content-Type, Cookie, X-Requested-With';
+      proxyRes.headers['access-control-allow-methods'] = 'GET, POST, PUT, DELETE, OPTIONS';
+      proxyRes.headers['access-control-allow-headers'] = 'Content-Type, Cookie, X-Requested-With, Authorization';
+      proxyRes.headers['access-control-expose-headers'] = 'Set-Cookie';
     }
   }));
 
