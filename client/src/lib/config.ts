@@ -1,10 +1,9 @@
 export const DASHBOARD_URLS = [
   {
-    id: 'sales',
-    url: '/api/ssp-proxy/',
-    title: 'Salesflow',
-    loginUrl: 'https://aps.work/ssp',
-    openInNewWindow: true
+    id: 'salesflow-embed',
+    url: 'https://sales-service-portal-bdgillihan.replit.app/',
+    title: 'SalesFlow Embed',
+    loginUrl: 'https://sales-service-portal-bdgillihan.replit.app/'
   },
   {
     id: 'powerbi',
@@ -46,5 +45,12 @@ export const DASHBOARD_URLS = [
     url: 'https://22762c29-3853-49fd-8fab-68c62fe53f01-00-ne1gi181pknk.kirk.replit.dev/dashboard',
     title: 'SalesFlow Dev',
     loginUrl: 'https://22762c29-3853-49fd-8fab-68c62fe53f01-00-ne1gi181pknk.kirk.replit.dev/dashboard'
+  },
+  {
+    id: 'salesflow-pop',
+    url: '/api/ssp-proxy/',
+    title: 'SalesFlow Pop',
+    loginUrl: 'https://aps.work/ssp',
+    openInNewWindow: true
   }
 ] as const;
