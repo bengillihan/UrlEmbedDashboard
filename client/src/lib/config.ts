@@ -36,21 +36,15 @@ export const DASHBOARD_URLS = [
     loginUrl: 'https://americanpower.quickbase.com/db/bp5hq3uqm/813bccff-c7f4-4298-aa2d-aa36e57ea55e'
   },
   {
-    id: 'ssp-embed',
-    url: 'https://sales-service-portal-embed-bdgillihan.replit.app/dashboard',
-    title: 'SSP Embed Test',
-    loginUrl: 'https://sales-service-portal-embed-bdgillihan.replit.app/dashboard'
-  },
-  {
-    id: 'ssp-direct',
-    url: 'https://sales-service-portal-bdgillihan.replit.app/dashboard',
-    title: 'SSP Direct Test',
-    loginUrl: 'https://sales-service-portal-bdgillihan.replit.app/dashboard'
-  },
-  {
     id: 'table-syncs',
     url: '/api/quickbase-proxy/db/btqxmmkir/tablereport?a=td',
     title: 'Table Syncs',
     loginUrl: 'https://americanpower.quickbase.com/db/btqxmmkir/tablereport?a=td'
+  },
+  {
+    id: 'salesflow-dev',
+    url: 'https://22762c29-3853-49fd-8fab-68c62fe53f01-00-ne1gi181pknk.kirk.replit.dev/dashboard',
+    title: 'SalesFlow Dev',
+    loginUrl: 'https://22762c29-3853-49fd-8fab-68c62fe53f01-00-ne1gi181pknk.kirk.replit.dev/dashboard'
   }
 ] as const;
