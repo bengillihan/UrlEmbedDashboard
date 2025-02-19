@@ -36,9 +36,9 @@ export const DASHBOARD_URLS = [
   },
   {
     id: 'table-syncs',
-    url: '/api/quickbase-proxy/db/btqxmmkir/tablereport?a=td',
+    url: '/api/quickbase-proxy/db/btqxmmkir/tablereport?a=q&qid=1',
     title: 'Table Syncs',
-    loginUrl: 'https://americanpower.quickbase.com/db/btqxmmkir/tablereport?a=td'
+    loginUrl: 'https://americanpower.quickbase.com/db/btqxmmkir/tablereport?a=q&qid=1'
   },
   {
     id: 'salesflow-dev',
