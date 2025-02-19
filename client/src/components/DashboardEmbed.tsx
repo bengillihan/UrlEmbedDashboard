@@ -3,7 +3,6 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { AlertCircle, ExternalLink } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { PowerBIEmbed } from './PowerBIEmbed';
 import { useToast } from '@/hooks/use-toast';
 
 interface DashboardEmbedProps {
@@ -14,7 +13,8 @@ interface DashboardEmbedProps {
   embedConfig?: {
     reportId: string;
     embedUrl: string;
-    tokenType: string;
+    autoAuth?: boolean;
+    ctid?: string;
   };
 }
 
@@ -54,13 +54,39 @@ export function DashboardEmbed({ url, title, loginUrl, openInNewWindow = false, 
     setHasError(false);
   };
 
-  // For PowerBI or any dashboard that needs to open in a new window
-  if (openInNewWindow || title.toLowerCase().includes('powerbi')) {
+  // Handle PowerBI embed directly
+  if (embedConfig) {
+    return (
+      <Card className="w-full h-full">
+        <CardContent className="p-0 h-full relative">
+          {isLoading && (
+            <div className="absolute inset-0 p-4">
+              <Skeleton className="w-full h-full" />
+            </div>
+          )}
+          <iframe
+            key={key}
+            title={title}
+            width="100%"
+            height="100%"
+            src={url}
+            frameBorder="0"
+            allowFullScreen={true}
+            onLoad={handleLoad}
+            onError={handleError}
+          />
+        </CardContent>
+      </Card>
+    );
+  }
+
+  // For dashboards that need to open in a new window
+  if (openInNewWindow) {
     return (
       <Card className="w-full h-full">
         <CardContent className="flex items-center justify-center h-full">
           <div className="text-center">
-            <h3 className="text-lg font-semibold text-gray-900 mb-4">{title} Dashboard</h3>
+            <h3 className="text-lg font-semibold text-gray-900 mb-4">{title}</h3>
             <Button onClick={handleOpenDashboard} className="gap-2">
               <ExternalLink className="h-4 w-4" />
               Open {title} in New Window
