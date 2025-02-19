@@ -1,4 +1,5 @@
 import { DashboardEmbed } from '@/components/DashboardEmbed';
+import { LinksList } from '@/components/LinksList';
 import { DASHBOARD_URLS } from '@/lib/config';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
@@ -15,13 +16,17 @@ export function DashboardGrid() {
         </TabsList>
         {DASHBOARD_URLS.map((dashboard) => (
           <TabsContent key={dashboard.id} value={dashboard.id} className="flex-1 h-screen">
-            <DashboardEmbed 
-              url={dashboard.url} 
-              title={dashboard.title}
-              loginUrl={dashboard.loginUrl}
-              openInNewWindow={dashboard.openInNewWindow}
-              embedConfig={'embedConfig' in dashboard ? dashboard.embedConfig : undefined}
-            />
+            {'isLinksTab' in dashboard ? (
+              <LinksList />
+            ) : (
+              <DashboardEmbed 
+                url={dashboard.url} 
+                title={dashboard.title}
+                loginUrl={dashboard.loginUrl}
+                openInNewWindow={dashboard.openInNewWindow}
+                embedConfig={'embedConfig' in dashboard ? dashboard.embedConfig : undefined}
+              />
+            )}
           </TabsContent>
         ))}
       </Tabs>

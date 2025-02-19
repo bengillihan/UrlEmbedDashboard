@@ -52,5 +52,12 @@ export const DASHBOARD_URLS = [
     title: 'SalesFlow Pop',
     loginUrl: 'https://aps.work/ssp',
     openInNewWindow: true
+  },
+  {
+    id: 'links',
+    url: '',
+    title: 'Links',
+    loginUrl: '',
+    isLinksTab: true
   }
 ] as const;
