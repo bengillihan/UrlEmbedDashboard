@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { AlertCircle, ExternalLink } from 'lucide-react';
@@ -30,8 +30,8 @@ export function DashboardEmbed({ url, title, loginUrl, openInNewWindow = false, 
     setHasError(false);
   };
 
-  const handleError = (error: Event) => {
-    console.error(`${title} dashboard error:`, error);
+  const handleError = (event: React.SyntheticEvent<HTMLIFrameElement, Event>) => {
+    console.error(`${title} dashboard error:`, event);
     setIsLoading(false);
     setHasError(true);
     toast({
@@ -42,7 +42,10 @@ export function DashboardEmbed({ url, title, loginUrl, openInNewWindow = false, 
   };
 
   const handleOpenDashboard = () => {
-    window.open(loginUrl, '_blank', 'noopener,noreferrer');
+    const win = window.open(loginUrl, '_blank', 'noopener,noreferrer');
+    if (win) {
+      win.focus();
+    }
   };
 
   const handleRefresh = () => {
@@ -51,7 +54,8 @@ export function DashboardEmbed({ url, title, loginUrl, openInNewWindow = false, 
     setHasError(false);
   };
 
-  if (openInNewWindow) {
+  // For PowerBI or any dashboard that needs to open in a new window
+  if (openInNewWindow || title.toLowerCase().includes('powerbi')) {
     return (
       <Card className="w-full h-full">
         <CardContent className="flex items-center justify-center h-full">
@@ -64,16 +68,6 @@ export function DashboardEmbed({ url, title, loginUrl, openInNewWindow = false, 
           </div>
         </CardContent>
       </Card>
-    );
-  }
-
-  if (embedConfig) {
-    return (
-      <PowerBIEmbed
-        accessToken="your_access_token_here" // This should be fetched from your backend
-        embedUrl={embedConfig.embedUrl}
-        reportId={embedConfig.reportId}
-      />
     );
   }
 
