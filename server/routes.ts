@@ -26,7 +26,7 @@ export function registerRoutes(app: Express): Server {
       'X-Forwarded-Host': 'aps.work',
       'X-Forwarded-Proto': 'https'
     },
-    onProxyReq: (proxyReq, req: any, res: any) => {
+    onProxyReq: (proxyReq: any, req: any, res: any) => {
       if (req.headers.cookie) {
         proxyReq.setHeader('Cookie', req.headers.cookie);
       }
@@ -97,6 +97,51 @@ export function registerRoutes(app: Express): Server {
         'Content-Type': 'text/plain'
       });
       res.end('Something went wrong with PowerBI proxy: ' + err.message);
+    }
+  }));
+
+  // Quickbase proxy configuration
+  app.use('/api/quickbase-proxy', createProxyMiddleware({
+    target: 'https://americanpower.quickbase.com',
+    changeOrigin: true,
+    pathRewrite: { '^/api/quickbase-proxy': '' },
+    secure: true,
+    headers: {
+      'X-Forwarded-Host': 'americanpower.quickbase.com',
+      'X-Forwarded-Proto': 'https',
+      'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
+      'Accept-Language': 'en-US,en;q=0.5',
+      'Connection': 'keep-alive'
+    },
+    onProxyReq: (proxyReq: any, req: any, res: any) => {
+      // Log request for debugging
+      console.log('[Quickbase Proxy] Proxying request to:', req.url);
+
+      // Copy original headers
+      if (req.headers.cookie) {
+        proxyReq.setHeader('Cookie', req.headers.cookie);
+      }
+    },
+    onProxyRes: (proxyRes: any, req: any, res: any) => {
+      // Handle cookies
+      const cookies = proxyRes.headers['set-cookie'];
+      if (cookies) {
+        proxyRes.headers['set-cookie'] = cookies.map((cookie: string) =>
+          cookie.replace(/Domain=[^;]+;/, '')
+            .replace(/Secure;/gi, '')
+            .replace(/SameSite=[^;]+;/gi, 'SameSite=Lax;')
+        );
+      }
+
+      // Log response status for debugging
+      console.log('[Quickbase Proxy] Response status:', proxyRes.statusCode);
+    },
+    onError: (err: Error, req: any, res: any) => {
+      console.error('[Quickbase Proxy] Error:', err);
+      res.writeHead(500, {
+        'Content-Type': 'text/plain'
+      });
+      res.end('Something went wrong with Quickbase proxy: ' + err.message);
     }
   }));
 
