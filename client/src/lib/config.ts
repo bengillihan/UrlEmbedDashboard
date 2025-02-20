@@ -30,6 +30,12 @@ export const DASHBOARD_URLS = [
     loginUrl: 'https://americanpower.quickbase.com/db/btqxmmkir/tablereport?a=q&qid=1'
   },
   {
+    id: 'product-backlog',
+    url: '/api/quickbase-proxy/db/bn8ezvb9v?a=q&qid=90',
+    title: 'Product Backlog',
+    loginUrl: 'https://americanpower.quickbase.com/db/bn8ezvb9v?a=q&qid=90'
+  },
+  {
     id: 'salesflow-dev',
     url: 'https://22762c29-3853-49fd-8fab-68c62fe53f01-00-ne1gi181pknk.kirk.replit.dev/dashboard',
     title: 'SalesFlow Dev',
