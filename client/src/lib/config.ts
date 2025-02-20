@@ -42,19 +42,6 @@ export const DASHBOARD_URLS = [
     loginUrl: 'https://americanpower.quickbase.com/db/bn8xkcehm?a=q&qid=105'
   },
   {
-    id: 'salesflow-dev',
-    url: 'https://22762c29-3853-49fd-8fab-68c62fe53f01-00-ne1gi181pknk.kirk.replit.dev/dashboard',
-    title: 'SalesFlow Dev',
-    loginUrl: 'https://22762c29-3853-49fd-8fab-68c62fe53f01-00-ne1gi181pknk.kirk.replit.dev/dashboard'
-  },
-  {
-    id: 'salesflow-pop',
-    url: '/api/ssp-proxy/',
-    title: 'SalesFlow Pop',
-    loginUrl: 'https://aps.work/ssp',
-    openInNewWindow: true
-  },
-  {
     id: 'links',
     url: '',
     title: 'Links',
