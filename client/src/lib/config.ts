@@ -1,10 +1,9 @@
 export const DASHBOARD_URLS = [
   {
     id: 'salesflow-embed',
-    url: 'https://aps.work/ssp',
+    url: 'https://sales-service-portal-v-2-bdgillihan.replit.app/dashboard',
     title: 'SalesFlow',
-    loginUrl: 'https://aps.work/ssp',
-    openInNewWindow: true
+    loginUrl: 'https://sales-service-portal-v-2-bdgillihan.replit.app/dashboard'
   },
   {
     id: 'powerbi-embed',

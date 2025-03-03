@@ -138,10 +138,11 @@ export function DashboardEmbed({ url, title, loginUrl, openInNewWindow = false, 
           className="w-full h-full border-0"
           onLoad={handleLoad}
           onError={handleError}
-          allow="fullscreen"
-          sandbox="allow-same-origin allow-scripts allow-popups allow-forms allow-top-navigation allow-popups-to-escape-sandbox"
+          allow="fullscreen; autoplay; clipboard-write; encrypted-media; picture-in-picture"
+          sandbox="allow-same-origin allow-scripts allow-popups allow-forms allow-top-navigation allow-popups-to-escape-sandbox allow-downloads allow-modals allow-presentation"
           referrerPolicy="no-referrer-when-downgrade"
           loading="lazy"
+          importance="high"
         />
       </CardContent>
     </Card>
